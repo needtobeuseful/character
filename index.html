@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Мой персонаж</title>
+<meta name="description" content="Персонаж зрителя: одень фигурку одеждой, найденной в мини-игре на стриме.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <main id="stage">
+    <canvas id="scene"></canvas>
+
+    <header class="topbar">
+      <div class="title">
+        <b id="title">Мой персонаж</b>
+        <span class="badge" id="mode-badge" hidden>все вещи</span>
+      </div>
+      <div class="count-pill" id="count-pill" title="Сколько вещей в гардеробе">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4.5 4.5 7 3 11.5l3 1.2V20h12v-7.3l3-1.2L19.5 7 15 4.5c-.5 1.5-1.6 2.3-3 2.3S9.5 6 9 4.5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>
+        <span id="count-text">0</span>
+      </div>
+    </header>
+
+    <div class="hint" id="hint">Покрути фигурку мышью или пальцем</div>
+    <div class="toast" id="toast" role="status"></div>
+    <div class="loading" id="loading">Загружаю персонажа...</div>
+  </main>
+
+  <aside id="shop">
+    <div class="shop-head">
+      <h2 id="shop-title">Гардероб</h2>
+      <p id="shop-sub">Одежда из сундуков мини-игры</p>
+    </div>
+    <div class="templates" id="templates" hidden></div>
+    <nav class="slots" id="slots"></nav>
+    <div class="shop-list" id="shop-list"></div>
+    <div class="shop-foot">
+      <button class="ghost" id="random" title="Надеть что-нибудь случайное">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+        Случайно
+      </button>
+      <button class="primary" id="done">Готово</button>
+    </div>
+  </aside>
+</div>
+
+<dialog id="result">
+  <h2 id="result-title">Персонаж готов!</h2>
+  <p id="result-lead">Отправь это сообщение в чат стрима - бот проверит, что всё это есть в твоём гардеробе, и наденет:</p>
+  <div class="code" id="result-command"></div>
+  <div class="row">
+    <span class="muted" id="result-length"></span>
+    <button class="primary small" id="copy-command">Скопировать</button>
+  </div>
+  <p>Ссылка на этот образ - можно вернуться к нему позже:</p>
+  <input id="result-link" readonly>
+  <div class="row">
+    <span class="muted" id="result-note">Пока сообщение не отправлено в чат, образ не сохранён.</span>
+    <button class="ghost small" id="copy-link">Скопировать</button>
+  </div>
+  <div class="row end">
+    <button class="ghost" id="close-result">Закрыть</button>
+  </div>
+</dialog>
+
+<script>
+  // Если модули не загрузились (открыто прямо из файла или нет интернета) -
+  // вместо вечной «загрузки» объясняем, что случилось
+  setTimeout(function () {
+    if (window.__avatarReady) return;
+    var el = document.getElementById('loading');
+    el.innerHTML = location.protocol === 'file:'
+      ? 'Эту страницу нельзя открыть прямо из файла - браузер не запускает модули с диска.<br>Запусти <b>start_local.bat</b> или открой сайт на GitHub Pages.'
+      : 'Не удалось загрузить персонажа. Проверь интернет: библиотека three.js грузится с cdn.jsdelivr.net.';
+    el.classList.add('error');
+  }, 6000);
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
