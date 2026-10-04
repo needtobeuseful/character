@@ -1,14 +1,16 @@
 // Редактор персонажа: гардероб зрителя и его фигурка.
 //
-// Ссылку на редактор присылает бот по команде !персонаж. После # в ней:
-//   n - ник зрителя, i - код его гардероба, l - код того, что сейчас надето.
-// Всё после # браузер никуда не отправляет - страница читает это сама.
+// Ссылку на редактор присылает бот по команде !персонаж. После # в ней -
+// один код (codec.js, encodeLink): ник зрителя, его гардероб и то, что
+// сейчас надето. Старые ссылки (#n=ник&i=гардероб&l=образ) тоже
+// открываются. Всё после # браузер никуда не отправляет - страница читает
+// это сама.
 //
 // В гардеробе всегда есть стартовые вещи (в каталоге у них starter: true) -
 // по одной в каждом слоте, а цвет кожи можно выбрать любой. Остальное
 // зритель находит в сундуках мини-игры.
 //
-// Без i редактор открывается в режиме каталога: доступны все вещи. Так
+// Без гардероба редактор открывается в режиме каталога: доступны все вещи. Так
 // собираются и образы NPC (продавцов в магазинах мини-игры): их готовые
 // образы - в catalog.json → npcLooks, кнопками «Образ NPC».
 // Сама страница ничего не сохраняет: зритель отправляет в чат
@@ -16,7 +18,7 @@
 
 import * as THREE from 'three';
 import { Wardrobe, buildFigure, FACING, Blinker, breathe } from './figure.js';
-import { decodeLook, decodeWardrobe, encodeLook } from './codec.js';
+import { decodeLook, decodeWardrobe, encodeLink, encodeLook, LINK_AVATAR, readLink } from './codec.js';
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -48,22 +50,34 @@ const SETS = catalog.sets || {};
 
 // ---------------------------------------------------------------- что пришло в ссылке
 
-const params = new URLSearchParams(location.hash.slice(1));
-const playerName = (params.get('n') || '').trim().slice(0, 40);
+const incoming = readLink(location.hash);
+const params = incoming.params || new URLSearchParams();
+const linked = incoming.link && incoming.link.page === LINK_AVATAR ? incoming.link : null;
+const playerName = incoming.name;
 const wardrobeText = params.get('i');
-const catalogMode = wardrobeText === null;
+const catalogMode = !incoming.link && !incoming.error && wardrobeText === null;
 const owned = new Set();       // id вещей, которые можно надеть
+const ownedCodes = [];         // номера найденных вещей - и тех, которых сайт ещё не знает, - для ссылки
 let unknownOwned = 0;          // вещи, которых этот сайт ещё не знает
 let brokenLink = '';
 
+function own(codes) {
+  for (const code of codes) {
+    ownedCodes.push(code);
+    const item = wardrobe.byCode.get(code);
+    if (item) owned.add(item.id);
+    else unknownOwned++;
+  }
+}
+
 for (const item of wardrobe.items) if (catalogMode || item.starter) owned.add(item.id);
-if (!catalogMode) {
+if (incoming.error || (incoming.link && !linked)) {
+  brokenLink = `Ссылка повреждена (${incoming.error || 'это ссылка на другую страницу'}) - попроси у бота новую: !персонаж`;
+} else if (linked) {
+  own(linked.wardrobe);
+} else if (!catalogMode) {
   try {
-    for (const code of decodeWardrobe(wardrobeText)) {
-      const item = wardrobe.byCode.get(code);
-      if (item) owned.add(item.id);
-      else unknownOwned++;
-    }
+    own(decodeWardrobe(wardrobeText));
   } catch (error) {
     brokenLink = `Ссылка повреждена (${error.message}) - попроси у бота новую: !персонаж`;
   }
@@ -73,7 +87,9 @@ if (!catalogMode) {
 function initialLook() {
   let look = wardrobe.defaultLook();
   const text = params.get('l');
-  if (text) {
+  if (linked && linked.look.length) {
+    look = wardrobe.lookFromCodes(linked.look);
+  } else if (text) {
     try {
       look = wardrobe.lookFromCodes(decodeLook(text));
     } catch (error) {
@@ -212,7 +228,6 @@ const FRAMES = {
   ears: { y: 1.68, half: 0.6 },
   hair: { y: 1.55, half: 0.56 },
   eyes: { y: 1.45, half: 0.34 },
-  mouth: { y: 1.37, half: 0.32 },
   nose: { y: 1.41, half: 0.34 },
   top: { y: 0.91, half: 0.48 },
   bottom: { y: 0.43, half: 0.4 },
@@ -222,17 +237,16 @@ const FRAMES = {
 };
 // От чего зависит картинка вещи: если это поменялось - перерисовать
 const DEPENDS = {
-  headwear: ['skin', 'hair', 'hair_color', 'eyes', 'mouth', 'nose', 'ears', 'head_extra'],
-  head_extra: ['skin', 'hair', 'hair_color', 'headwear', 'ears', 'eyes', 'mouth', 'nose'],
-  ears: ['skin', 'hair', 'hair_color', 'headwear', 'head_extra', 'eyes', 'mouth', 'nose'],
-  hair: ['skin', 'hair_color', 'headwear', 'eyes', 'mouth', 'nose', 'ears', 'head_extra'],
-  eyes: ['skin', 'eye_color', 'hair_color', 'mouth', 'nose'],
-  mouth: ['skin', 'eye_color', 'hair_color', 'eyes', 'nose'],
-  nose: ['skin', 'eye_color', 'hair_color', 'eyes', 'mouth'],
+  headwear: ['skin', 'hair', 'hair_color', 'eyes', 'nose', 'ears', 'head_extra'],
+  head_extra: ['skin', 'hair', 'hair_color', 'headwear', 'ears', 'eyes', 'nose'],
+  ears: ['skin', 'hair', 'hair_color', 'headwear', 'head_extra', 'eyes', 'nose'],
+  hair: ['skin', 'hair_color', 'headwear', 'eyes', 'nose', 'ears', 'head_extra'],
+  eyes: ['skin', 'eye_color', 'hair_color', 'nose'],
+  nose: ['skin', 'eye_color', 'hair_color', 'eyes'],
   top: ['skin'],
   bottom: ['skin', 'top'],
   shoes: ['skin', 'bottom'],
-  wings: ['skin', 'top', 'hair', 'hair_color', 'headwear', 'head_extra', 'ears', 'eyes', 'mouth', 'nose', 'tail'],
+  wings: ['skin', 'top', 'hair', 'hair_color', 'headwear', 'head_extra', 'ears', 'eyes', 'nose', 'tail'],
   tail: ['skin', 'top', 'bottom', 'wings', 'shoes'],
 };
 const thumbs = new Map();
@@ -393,12 +407,11 @@ function renderTemplates() {
 
 const currentCode = () => encodeLook(wardrobe.lookCodes(look));
 
+// Что записать после # - та же ссылка одним кодом, что присылает бот. В
+// режиме каталога - только образ (#l=код)
 function stateHash() {
-  const parts = [];
-  if (playerName) parts.push(`n=${encodeURIComponent(playerName)}`);
-  if (!catalogMode) parts.push(`i=${wardrobeText}`);
-  parts.push(`l=${currentCode()}`);
-  return parts.join('&');
+  if (catalogMode) return `l=${currentCode()}`;
+  return encodeLink(LINK_AVATAR, playerName, { wardrobe: ownedCodes, look: wardrobe.lookCodes(look) });
 }
 
 function saveState() {
